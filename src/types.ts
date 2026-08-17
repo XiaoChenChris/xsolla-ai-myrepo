@@ -1,6 +1,15 @@
+export type ChangeStatus =
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "untracked";
+
 export type ChangedFile = {
   path: string;
-  status: "added" | "modified" | "deleted" | "untracked";
+  status: ChangeStatus;
+  /** 仅 renamed：变更前的路径。 */
+  oldPath?: string;
 };
 
 export type ValidationResult = {

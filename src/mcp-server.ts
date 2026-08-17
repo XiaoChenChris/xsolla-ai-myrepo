@@ -10,15 +10,17 @@ server.tool(
   "review_repository",
   "Inspects a Git repository and returns a review report.",
   {
-    repo_path: z.string().describe("Repository path to inspect."),
-    baseRef: z.string().optional(),
-    validationCommands: z.array(z.string()).optional(),
+    repoPath: z.string().describe("Repository path to inspect."),
+    baseRef: z.string().optional().describe("Base ref to diff against (defaults to the repository's default branch)."),
+    validationCommands: z.array(z.string()).optional().describe("Shell commands to run as validations."),
+    format: z.enum(["markdown", "json"]).optional().describe("Report format (default: markdown)."),
   },
-  async (input: any) => {
+  async ({ repoPath, baseRef, validationCommands, format }) => {
     const report = await reviewRepository({
-      repositoryPath: input.repoPath,
-      baseRef: input.baseRef,
-      validationCommands: input.validationCommands,
+      repositoryPath: repoPath,
+      baseRef,
+      validationCommands,
+      format,
     });
     return { content: [{ type: "text", text: report }] };
   },
