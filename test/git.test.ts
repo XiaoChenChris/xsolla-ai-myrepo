@@ -72,7 +72,19 @@ describe("git inspection", () => {
   });
 
   it("throws a friendly GitError for a non-repository path", () => {
-    expect(() => changedFiles(tmpdir(), undefined)).toThrow(/git .* failed|default branch/);
+    expect(() => changedFiles(tmpdir(), undefined)).toThrow(
+      /Not a git repository|git .* failed|default branch/,
+    );
+  });
+
+  it("rejects a bare repository up front", () => {
+    const bareDir = join(tmpdir(), `inspector-bare-${Date.now()}`);
+    execFileSync("git", ["init", "--bare", bareDir], { encoding: "utf8" });
+    try {
+      expect(() => changedFiles(bareDir, undefined)).toThrow(/bare|Not a git repository/);
+    } finally {
+      rmSync(bareDir, { recursive: true, force: true });
+    }
   });
 
   it("reports a friendly error when base and HEAD have no merge base", () => {

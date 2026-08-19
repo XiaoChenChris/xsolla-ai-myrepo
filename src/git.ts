@@ -36,6 +36,23 @@ function tryGit(repositoryPath: string, args: string[]): boolean {
   }
 }
 
+/** 前置检查仓库可审查：非仓库路径和 bare 仓库都会被拒绝。 */
+function assertGitRepository(repositoryPath: string): void {
+  let insideWorkTree: string;
+  try {
+    insideWorkTree = git(repositoryPath, ["rev-parse", "--is-inside-work-tree"]);
+  } catch {
+    throw new GitError(`Not a git repository: ${repositoryPath}`);
+  }
+  // bare repo 对该命令输出 "false" 但退出码 0，只查退出码会放行，
+  // 随后在 ls-files --others 深处以 raw plumbing 输出崩溃。
+  if (insideWorkTree !== "true") {
+    throw new GitError(
+      `Not a git repository (bare repository with no work tree?): ${repositoryPath}`,
+    );
+  }
+}
+
 /**
  * 执行 diff。shallow clone（--depth 1）或无关历史下 `base...HEAD`
  * 没有 merge base 会直接 fatal，这里转成可操作的 GitError。
@@ -100,6 +117,7 @@ function mapStatus(code: string): ChangeStatus {
 }
 
 export function changedFiles(repositoryPath: string, baseRef?: string): ChangedFile[] {
+  assertGitRepository(repositoryPath);
   const base = baseRef ?? defaultBranch(repositoryPath);
   const output = runGitDiff(repositoryPath, base);
 

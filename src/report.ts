@@ -17,6 +17,16 @@ function escapeInline(text: string): string {
   );
 }
 
+/**
+ * 选择比内容中任何反引号串都长的 fence，防止校验输出（不可信文本）
+ * 逃出代码块渲染成 markdown。
+ */
+function fenceFor(content: string): string {
+  const runs = content.match(/`+/g) ?? [];
+  const longest = runs.reduce((max, run) => Math.max(max, run.length), 0);
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
 export function renderReport(result: ReviewResult, format: ReportFormat): string {
   return format === "json" ? jsonReport(result) : markdownReport(result);
 }
@@ -45,11 +55,13 @@ export function markdownReport(result: ReviewResult): string {
     lines.push("- (none)");
   } else {
     for (const item of result.validationResults) {
+      const output = truncate(item.output);
+      const fence = fenceFor(output);
       lines.push(
         `### ${escapeInline(item.command)} [${item.status}, exit ${item.exitCode}]`,
-        "```",
-        truncate(item.output) || "(no output)",
-        "```",
+        fence,
+        output || "(no output)",
+        fence,
       );
     }
   }

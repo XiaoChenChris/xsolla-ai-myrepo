@@ -83,6 +83,20 @@ describe("markdownReport", () => {
     expect(report).toContain("[failed, exit 2]");
   });
 
+  it("uses a fence longer than any backtick run in the output", () => {
+    const report = markdownReport(
+      sampleResult({
+        changedFiles: [],
+        validationResults: [{ command: "t", status: "failed", output: "a ``` b", exitCode: 1 }],
+      }),
+    );
+
+    // 输出含三反引号时 fence 升为 4 个反引号，代码块不会被提前关闭
+    expect(report).toContain("````\na ``` b\n````");
+    // 报告里不存在裸的三反引号 fence 行
+    expect(report.split("\n")).not.toContain("```");
+  });
+
   it("shows (none) for empty changed files and validations", () => {
     const report = markdownReport(
       sampleResult({ changedFiles: [], validationResults: [] }),

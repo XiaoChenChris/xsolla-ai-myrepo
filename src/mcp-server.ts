@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { reviewRepository } from "./core.js";
 import { renderReport } from "./report.js";
+
+/** 去重：模型重复请求同名校验不应重复执行。 */
+export function dedupe(commands: string[] | undefined): string[] {
+  return [...new Set(commands ?? [])];
+}
 
 const server = new McpServer({ name: "repository-inspector", version: "2.0.0" });
 
@@ -21,7 +27,7 @@ server.tool(
       const result = await reviewRepository({
         repositoryPath: repoPath,
         baseRef,
-        validationCommands,
+        validationCommands: dedupe(validationCommands),
         format,
       });
       const report = renderReport(result, format ?? "markdown");
@@ -38,4 +44,10 @@ server.tool(
   },
 );
 
-await server.connect(new StdioServerTransport());
+// 被测试 import 时不应真的连接 stdio
+const invokedDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  await server.connect(new StdioServerTransport());
+}
