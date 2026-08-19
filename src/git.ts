@@ -9,15 +9,48 @@ export class GitError extends Error {
   }
 }
 
+// 大仓库的 diff 输出可能远超 execFileSync 默认的 1MB maxBuffer，
+// 不设上限会让整个审查在解析变更前就崩溃。
+const GIT_MAX_BUFFER_BYTES = 32 * 1024 * 1024;
+
 function git(repositoryPath: string, args: string[]): string {
   try {
     return execFileSync("git", args, {
       cwd: repositoryPath,
       encoding: "utf8",
+      maxBuffer: GIT_MAX_BUFFER_BYTES,
     }).trim();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new GitError(`git ${args.join(" ")} failed: ${detail}`);
+  }
+}
+
+/** 静默探测某条 git 命令是否成功，用于错误路径区分。 */
+function tryGit(repositoryPath: string, args: string[]): boolean {
+  try {
+    git(repositoryPath, args);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 执行 diff。shallow clone（--depth 1）或无关历史下 `base...HEAD`
+ * 没有 merge base 会直接 fatal，这里转成可操作的 GitError。
+ */
+function runGitDiff(repositoryPath: string, baseRef: string): string {
+  try {
+    return git(repositoryPath, ["diff", "--name-status", "-M", `${baseRef}...HEAD`]);
+  } catch (error) {
+    if (!tryGit(repositoryPath, ["merge-base", baseRef, "HEAD"])) {
+      throw new GitError(
+        `No merge base between "${baseRef}" and HEAD in ${repositoryPath}. ` +
+          `Pass --base-ref explicitly; shallow clones may need "git fetch --unshallow".`,
+      );
+    }
+    throw error instanceof GitError ? error : new GitError(String(error));
   }
 }
 
@@ -68,7 +101,7 @@ function mapStatus(code: string): ChangeStatus {
 
 export function changedFiles(repositoryPath: string, baseRef?: string): ChangedFile[] {
   const base = baseRef ?? defaultBranch(repositoryPath);
-  const output = git(repositoryPath, ["diff", "--name-status", "-M", `${base}...HEAD`]);
+  const output = runGitDiff(repositoryPath, base);
 
   const files: ChangedFile[] = [];
   for (const line of output.split("\n")) {

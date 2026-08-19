@@ -5,6 +5,7 @@ describe("runValidation", () => {
   it("resolves passed for a successful command", async () => {
     const result = await runValidation("node -e \"console.log('ok')\"", process.cwd());
     expect(result.status).toBe("passed");
+    expect(result.exitCode).toBe(0);
     expect(result.output).toContain("ok");
   });
 
@@ -14,6 +15,7 @@ describe("runValidation", () => {
       process.cwd(),
     );
     expect(result.status).toBe("failed");
+    expect(result.exitCode).toBe(3);
   });
 
   it("truncates long output", async () => {
@@ -34,6 +36,7 @@ describe("runValidation", () => {
     );
     expect(result.status).toBe("failed");
     expect(result.output).toContain("timed out");
+    expect(result.exitCode).toBe(-1);
   }, 10_000);
 
   it("runs multiple commands in order", async () => {

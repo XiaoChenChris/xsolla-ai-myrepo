@@ -30,18 +30,18 @@ export function runValidation(
       (error, stdout, stderr) => {
         const output = truncateOutput(`${stdout}${stderr}`.trim(), maxOutputChars);
         if (error) {
-          const reason =
-            error.killed && error.signal
-              ? `timed out after ${timeoutMs}ms`
-              : error.message;
+          const timedOut = Boolean(error.killed && error.signal);
+          const reason = timedOut ? `timed out after ${timeoutMs}ms` : error.message;
           resolve({
             command,
             status: "failed",
             output: output || `Command failed: ${reason}`,
+            // 超时（被 kill）用 -1 哨兵，其余取真实退出码
+            exitCode: typeof error.code === "number" ? error.code : timedOut ? -1 : 1,
           });
           return;
         }
-        resolve({ command, status: "passed", output });
+        resolve({ command, status: "passed", output, exitCode: 0 });
       },
     );
   });

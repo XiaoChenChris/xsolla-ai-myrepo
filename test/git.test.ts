@@ -74,4 +74,23 @@ describe("git inspection", () => {
   it("throws a friendly GitError for a non-repository path", () => {
     expect(() => changedFiles(tmpdir(), undefined)).toThrow(/git .* failed|default branch/);
   });
+
+  it("reports a friendly error when base and HEAD have no merge base", () => {
+    // 构造无关历史：另一个独立仓库 fetch 进来后，base...HEAD 无共同祖先
+    // （等价于 shallow clone / 重写历史的真实场景）
+    const otherDir = mkdtempSync(join(tmpdir(), "inspector-other-"));
+    try {
+      runGit(otherDir, ["init", "-b", "main"]);
+      runGit(otherDir, ["config", "user.email", "test@example.com"]);
+      runGit(otherDir, ["config", "user.name", "Test"]);
+      writeFileSync(join(otherDir, "x.txt"), "x\n");
+      runGit(otherDir, ["add", "."]);
+      runGit(otherDir, ["commit", "-m", "other"]);
+      runGit(repoDir, ["fetch", otherDir, "HEAD"]);
+      const otherSha = runGit(repoDir, ["rev-parse", "FETCH_HEAD"]);
+      expect(() => changedFiles(repoDir, otherSha)).toThrow(/No merge base/);
+    } finally {
+      rmSync(otherDir, { recursive: true, force: true });
+    }
+  });
 });
