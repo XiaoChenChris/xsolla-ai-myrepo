@@ -43,7 +43,7 @@
    转义防止恶意路径/命令破坏报告结构；超长输出在报告层也做了上限。
 5. **CLI 加固**。带空格的 `--repo` 路径不再被截断；`--format` 做了校验；
    `--output` 可选择报告文件；增加了 `--help`；未知选项大声报错而不是被忽略。
-6. **测试**。从 1 个理想路径测试扩充到 31 个测试，覆盖 git 解析、校验失败/
+6. **测试**。从 1 个理想路径测试扩充到 35 个测试，覆盖 git 解析、校验失败/
    超时/截断、Markdown 转义、JSON 输出、核心编排、CLI 参数解析与端到端退出码。
 
 ## 提交前复查追加的修复（2026-08-19）
@@ -80,11 +80,30 @@
 测试相应扩展到 31 个，新增覆盖：runCli 端到端退出码（0/1/2）、exitCode 进
 报告（超时 -1 哨兵）、空状态 `(none)` 渲染、no-merge-base 场景。
 
+## 提交前第三轮加固（2026-08-19）
+
+对照第二份公开的参考实现复查后，又补了三处：
+
+1. **Fence-safe 代码块**。报告代码块的 fence 长度现在动态计算（长于校验
+   输出中任何反引号串），不可信输出无法逃出代码块渲染成攻击者选定的
+   markdown。
+2. **bare 仓库守卫**。`git rev-parse --is-inside-work-tree` 对 bare 仓库
+   输出 `false` 但退出码 0，只查退出码会放行、随后在 `ls-files --others`
+   深处崩溃；现在守卫检查输出值而不是仅检查退出状态。
+3. **MCP 校验去重**。模型重复请求的校验名称在执行前去重，
+   `["unit","unit","unit"]` 只运行一次而不是三次。
+
+测试相应扩展到 35 个（fence-safe、bare repo、去重各有回归测试）。
+
 ## 你有意未做哪些内容？
 
 - **没有给校验命令做沙箱/白名单**。我选择的信任边界（见接口决策）信任 CLI
   用户；我用超时和输出上限来约束执行，而不是发明一个会打断 `npm test` 这类
-  工作流的命令白名单。
+  工作流的命令白名单。**演进方向**：若代理成为主要消费者，将引入操作员按名称
+  授权的可配置白名单（如 `INSPECTOR_ALLOWED_VALIDATIONS="unit=npm test"`，
+  未配置时服务器只读并声明 `readOnlyHint`），并让 MCP 返回结构化摘要
+  （`changed_file_count`、`validations_passed/failed`），使代理无需解析
+  markdown 即可分流——这两个能力在代理主导的部署里价值最高。
 - **没有做 staged-vs-unstaged 的 diff 模式**。工具审查的是相对基准 ref 的
   已提交变更，符合 README 的契约；只审查工作区的模式会改变语义，值得单独
   做决策。
@@ -171,7 +190,7 @@
 |---|---|
 | `npm install` | 成功（esbuild 有 1 条 allow-scripts 警告，不阻塞） |
 | `npm run typecheck` | 通过，严格模式，无错误 |
-| `npm test` | **31/31 通过**（原来是 1/1） |
+| `npm test` | **35/35 通过**（原来是 1/1） |
 | `npm run inspector -- review --repo .` | 退出码 0；报告列出未跟踪文件（原来为空） |
 | `npm run inspector -- review --repo . --validate "git rev-parse HEAD~1"` | 退出码 0；校验记录为 **failed**（原来：崩溃，退出码 1） |
 | 临时仓库 `--validate "node -e process.exit(1)"`（端到端） | 退出码 **2**，报告含 `[failed, exit 1]`（校验失败可被 CI 感知） |
